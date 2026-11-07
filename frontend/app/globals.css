@@ -1,0 +1,1152 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+/* =========================================================================
+   ChartFlow Ai — Midnight Emerald + Champagne Gold
+   ----------------------------------------------------------------
+   Brand surface system (used directly via Tailwind arbitrary classes
+   and via design tokens). Three surface tiers + two brand accents.
+     midnight       #0A0F0D  page background
+     charcoal       #0F1815  card surface
+     charcoal-raised#152821  raised / hover surface
+     emerald        #10B981  primary brand
+     champagne      #F5C16C  premium accent (gold)
+     ivory          #F8FAFC  body text
+     ivory-soft     #94A3B8  muted text
+   =========================================================================
+   Light luxury theme — used on activate-account / purchase-* pages.
+   Same emerald + champagne accents on a clean white surface.
+   ========================================================================= */
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.16 0.012 160);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.16 0.012 160);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.16 0.012 160);
+  --primary: oklch(0.65 0.16 158);
+  --primary-foreground: oklch(0.99 0.005 155);
+  --secondary: oklch(0.97 0.01 158);
+  --secondary-foreground: oklch(0.18 0.012 160);
+  --muted: oklch(0.97 0.005 160);
+  --muted-foreground: oklch(0.50 0.015 160);
+  --accent: oklch(0.84 0.13 85);
+  --accent-foreground: oklch(0.18 0.012 160);
+  --destructive: oklch(0.60 0.22 25);
+  --destructive-foreground: oklch(0.99 0.005 160);
+  --border: oklch(0.93 0.006 160);
+  --input: oklch(0.95 0.006 160);
+  --ring: oklch(0.65 0.16 158);
+  --chart-1: oklch(0.65 0.16 158);
+  --chart-2: oklch(0.60 0.22 25);
+  --chart-3: oklch(0.84 0.13 85);
+  --chart-4: oklch(0.50 0.015 160);
+  --chart-5: oklch(0.18 0.012 160);
+  --radius: 0.75rem;
+  --sidebar: oklch(0.98 0.005 160);
+  --sidebar-foreground: oklch(0.16 0.012 160);
+  --sidebar-primary: oklch(0.65 0.16 158);
+  --sidebar-primary-foreground: oklch(0.99 0.005 155);
+  --sidebar-accent: oklch(0.97 0.005 160);
+  --sidebar-accent-foreground: oklch(0.18 0.012 160);
+  --sidebar-border: oklch(0.93 0.006 160);
+  --sidebar-ring: oklch(0.65 0.16 158);
+
+  /* Brand surface palette (always-dark surfaces, used everywhere) */
+  --midnight: #0A0F0D;
+  --midnight-elevated: #0C1411;
+  --charcoal: #0F1815;
+  --charcoal-raised: #152821;
+  --charcoal-line: #1B2D27;
+  --emerald-brand: #10B981;
+  --emerald-soft: #34D399;
+  --emerald-glow: rgba(16, 185, 129, 0.18);
+  --champagne: #F5C16C;
+  --champagne-light: #FCD9A8;
+  --champagne-glow: rgba(245, 193, 108, 0.18);
+  --ivory: #F8FAFC;
+  --ivory-soft: #94A3B8;
+  --ivory-faint: #64748B;
+}
+
+/* =========================================================================
+   Dark trading-terminal theme — used by the /livechart route only.
+   Wrap the page with <div className="dark"> to opt in.
+   ========================================================================= */
+.dark {
+  --background: oklch(0.17 0.02 250);
+  --foreground: oklch(0.96 0.01 250);
+  --card: oklch(0.21 0.02 250);
+  --card-foreground: oklch(0.96 0.01 250);
+  --popover: oklch(0.21 0.02 250);
+  --popover-foreground: oklch(0.96 0.01 250);
+  --primary: oklch(0.72 0.17 155);
+  --primary-foreground: oklch(0.16 0.02 250);
+  --secondary: oklch(0.27 0.02 250);
+  --secondary-foreground: oklch(0.96 0.01 250);
+  --muted: oklch(0.27 0.02 250);
+  --muted-foreground: oklch(0.70 0.02 250);
+  --accent: oklch(0.32 0.03 250);
+  --accent-foreground: oklch(0.96 0.01 250);
+  --destructive: oklch(0.63 0.22 25);
+  --destructive-foreground: oklch(0.98 0.01 250);
+  --border: oklch(0.30 0.02 250);
+  --input: oklch(0.25 0.02 250);
+  --ring: oklch(0.72 0.17 155);
+  --chart-1: oklch(0.72 0.17 155);
+  --chart-2: oklch(0.63 0.22 25);
+  --chart-3: oklch(0.70 0.02 250);
+  --chart-4: oklch(0.80 0.15 85);
+  --chart-5: oklch(0.60 0.18 230);
+  --sidebar: oklch(0.19 0.02 250);
+  --sidebar-foreground: oklch(0.96 0.01 250);
+  --sidebar-primary: oklch(0.72 0.17 155);
+  --sidebar-primary-foreground: oklch(0.16 0.02 250);
+  --sidebar-accent: oklch(0.27 0.02 250);
+  --sidebar-accent-foreground: oklch(0.96 0.01 250);
+  --sidebar-border: oklch(0.30 0.02 250);
+  --sidebar-ring: oklch(0.72 0.17 155);
+}
+
+@theme inline {
+  --font-sans: 'Geist', 'Geist Fallback';
+  --font-mono: 'Geist Mono', 'Geist Mono Fallback';
+  --font-display: var(--font-quintessential), serif;
+  --font-serif: var(--font-cormorant), serif;
+  /* Antique-luxury body font for the Activate Account flow.
+     IM Fell Double Pica SC is a small-caps Old-Style serif drawn from
+     John Fell's 17th-century type — it gives the activation page a
+     "membership certificate / heritage" feel that pairs naturally with
+     the Gem and Unlock motifs on this surface.
+     Opt in via `font-[var(--font-luxury)]`. */
+  --font-luxury: var(--font-im-fell), 'IM Fell Double Pica SC Fallback', 'Cormorant Garamond', Georgia, serif;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Brand utility colors — usable as bg-midnight, text-champagne, etc. */
+  --color-midnight: var(--midnight);
+  --color-midnight-elevated: var(--midnight-elevated);
+  --color-charcoal: var(--charcoal);
+  --color-charcoal-raised: var(--charcoal-raised);
+  --color-charcoal-line: var(--charcoal-line);
+  --color-emerald-brand: var(--emerald-brand);
+  --color-emerald-soft: var(--emerald-soft);
+  --color-champagne: var(--champagne);
+  --color-champagne-light: var(--champagne-light);
+  --color-ivory: var(--ivory);
+  --color-ivory-soft: var(--ivory-soft);
+  --color-ivory-faint: var(--ivory-faint);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Luxury body font utility — IM Fell Double Pica SC for Activate Account flow. */
+@layer utilities {
+  .font-luxury {
+    font-family: var(--font-luxury);
+  }
+  /* Display numerals utility — New Rocker, used for stat numbers on the
+     Profile page so every digit has the same blackletter accent. */
+  .font-rocker {
+    font-family: var(--font-new-rocker), serif;
+  }
+}
+
+/* =========================================================================
+   Premium animations — used across the marketing pages.
+   ========================================================================= */
+
+/* Subtle pulsing dot for "LIVE" status indicators. */
+@keyframes live-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.55;
+    transform: scale(1.18);
+  }
+}
+.live-dot {
+  animation: live-pulse 1.4s ease-in-out infinite;
+}
+
+/* Expanding ring used behind animated icon badges. */
+@keyframes ring-pulse {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.55;
+  }
+  100% {
+    transform: scale(1.7);
+    opacity: 0;
+  }
+}
+.icon-ring {
+  animation: ring-pulse 2.4s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+.icon-ring-delay {
+  animation-delay: 1.2s;
+}
+
+/* Slow vertical float for accent elements. */
+@keyframes float-soft {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+.float-soft {
+  animation: float-soft 4.2s ease-in-out infinite;
+}
+
+/* Drifting aurora used as luxury background lighting. */
+@keyframes aurora-drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+    opacity: 0.55;
+  }
+  33% {
+    transform: translate3d(4%, -3%, 0) scale(1.08);
+    opacity: 0.7;
+  }
+  66% {
+    transform: translate3d(-3%, 2%, 0) scale(0.96);
+    opacity: 0.5;
+  }
+}
+.aurora {
+  animation: aurora-drift 14s ease-in-out infinite;
+}
+.aurora-delay {
+  animation-delay: -7s;
+}
+
+/* Continuous shine traveling across a clipped-to-text gradient.
+   Used on the hero headline for a luxury double-gradient effect. */
+@keyframes text-shine {
+  0% {
+    background-position: 200% center;
+  }
+  100% {
+    background-position: -200% center;
+  }
+}
+.text-shine {
+  background-image: linear-gradient(
+    110deg,
+    #34d399 0%,
+    #6ee7b7 18%,
+    #fcd9a8 38%,
+    #ffffff 50%,
+    #fcd9a8 62%,
+    #6ee7b7 82%,
+    #34d399 100%
+  );
+  background-size: 250% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: text-shine 5.5s linear infinite;
+}
+.text-shine-accent {
+  background-image: linear-gradient(
+    110deg,
+    #f5c16c 0%,
+    #fcd9a8 22%,
+    #ffffff 50%,
+    #fcd9a8 78%,
+    #f5c16c 100%
+  );
+  background-size: 220% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: text-shine 4.5s linear infinite;
+}
+
+/* Lime shine — profile / signal rooms, matches the home page. */
+.text-shine-volt {
+  background-image: linear-gradient(110deg, #F3F5EF 0%, #FFFFFF 35%, #CDFF17 50%, #FFFFFF 65%, #F3F5EF 100%);
+  background-size: 250% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: text-shine 5.5s linear infinite;
+}
+.text-shine-volt-accent {
+  background-image: linear-gradient(110deg, #9FCC10 0%, #CDFF17 30%, #F2FFC2 50%, #CDFF17 70%, #9FCC10 100%);
+  background-size: 220% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: text-shine 4.5s linear infinite;
+}
+
+/* Teal + onyx shine — used on the dark teal/black home page surface. */
+.text-shine-teal {
+  background-image: linear-gradient(
+    110deg,
+    #1B7892 0%,
+    #2DA9C7 18%,
+    #E8F4F7 38%,
+    #FFFFFF 50%,
+    #E8F4F7 62%,
+    #2DA9C7 82%,
+    #1B7892 100%
+  );
+  background-size: 250% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: text-shine 5.5s linear infinite;
+}
+.text-shine-teal-accent {
+  background-image: linear-gradient(
+    110deg,
+    #1B7892 0%,
+    #5BC0D8 22%,
+    #FFFFFF 50%,
+    #5BC0D8 78%,
+    #1B7892 100%
+  );
+  background-size: 220% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: text-shine 4.5s linear infinite;
+}
+
+/* Light-background shine — uses darker pigments so the gradient stays
+   visible against the cream/ivory home page surface. */
+.text-shine-luxe {
+  background-image: linear-gradient(
+    110deg,
+    #047857 0%,
+    #059669 18%,
+    #b8862e 38%,
+    #0f1815 50%,
+    #b8862e 62%,
+    #059669 82%,
+    #047857 100%
+  );
+  background-size: 250% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: text-shine 5.5s linear infinite;
+}
+.text-shine-luxe-accent {
+  background-image: linear-gradient(
+    110deg,
+    #b8862e 0%,
+    #d49b3d 22%,
+    #0f1815 50%,
+    #d49b3d 78%,
+    #b8862e 100%
+  );
+  background-size: 220% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: text-shine 4.5s linear infinite;
+}
+
+/* Champagne-gold sheen running diagonally across an element. */
+@keyframes sheen {
+  0% {
+    transform: translateX(-120%) skewX(-18deg);
+    opacity: 0;
+  }
+  18% {
+    opacity: 0.55;
+  }
+  35%,
+  100% {
+    transform: translateX(220%) skewX(-18deg);
+    opacity: 0;
+  }
+}
+.sheen {
+  animation: sheen 5.8s ease-in-out infinite;
+}
+
+/* Continuous luxury shine for premium CTA buttons — slower, smoother sweep
+   that runs forever to keep the button feeling alive. */
+@keyframes cta-shine {
+  0% {
+    transform: translateX(-160%) skewX(-20deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.85;
+  }
+  45% {
+    opacity: 0.85;
+  }
+  60%,
+  100% {
+    transform: translateX(260%) skewX(-20deg);
+    opacity: 0;
+  }
+}
+.cta-shine {
+  animation: cta-shine 3.2s ease-in-out infinite;
+}
+
+/* Soft breathing pulse glow used on premium CTAs to keep the button
+   continuously attention-grabbing without being noisy. */
+@keyframes cta-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 8px 24px -8px rgba(91, 192, 216, 0.55),
+      0 0 0 1px rgba(91, 192, 216, 0.35) inset,
+      0 0 0 0 rgba(91, 192, 216, 0);
+  }
+  50% {
+    box-shadow:
+      0 12px 36px -6px rgba(91, 192, 216, 0.85),
+      0 0 0 1px rgba(125, 227, 255, 0.55) inset,
+      0 0 24px 0 rgba(91, 192, 216, 0.45);
+  }
+}
+.cta-pulse {
+  animation: cta-pulse 2.6s ease-in-out infinite;
+}
+
+/* Subtle "wiggle" used on the community-link icon — a gentle side-to-side
+   tilt that signals interactivity without being noisy. Used via Tailwind's
+   arbitrary animation syntax, e.g. `animate-[wiggle_2.4s_ease-in-out_infinite]`. */
+@keyframes wiggle {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  20% {
+    transform: rotate(-12deg);
+  }
+  40% {
+    transform: rotate(10deg);
+  }
+  60% {
+    transform: rotate(-6deg);
+  }
+  80% {
+    transform: rotate(4deg);
+  }
+}
+
+/* Continuously rotating conic gradient for premium "halo" rings. */
+@keyframes spin-slow {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.spin-slow {
+  animation: spin-slow 9s linear infinite;
+}
+
+/* Subtle scale-pulse used on premium ornament icons — Gem, Crown, etc.
+   Just enough breath to feel "alive" without being noisy. */
+@keyframes icon-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.92;
+  }
+  50% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+}
+.icon-pulse {
+  animation: icon-pulse 2.6s ease-in-out infinite;
+}
+
+/* Gentle vertical drift used on small badge icons. */
+@keyframes icon-drift {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
+}
+.icon-drift {
+  animation: icon-drift 3.2s ease-in-out infinite;
+}
+
+/* Continuous slow tilt �� premium "ticking" feel for clock-like icons. */
+@keyframes icon-tilt {
+  0%,
+  100% {
+    transform: rotate(-4deg);
+  }
+  50% {
+    transform: rotate(4deg);
+  }
+}
+.icon-tilt {
+  animation: icon-tilt 4.8s ease-in-out infinite;
+}
+
+/* Soft glow pulse for animated icons. */
+@keyframes glow-soft {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 0 rgba(16, 185, 129, 0));
+  }
+  50% {
+    filter: drop-shadow(0 0 10px rgba(16, 185, 129, 0.55));
+  }
+}
+.glow-soft {
+  animation: glow-soft 2.6s ease-in-out infinite;
+}
+@keyframes glow-gold-pulse {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 0 rgba(245, 193, 108, 0));
+  }
+  50% {
+    filter: drop-shadow(0 0 12px rgba(245, 193, 108, 0.65));
+  }
+}
+.glow-gold {
+  animation: glow-gold-pulse 2.6s ease-in-out infinite;
+}
+
+/* =========================================================================
+   Animated check & cross marks — used in pricing cards.
+   ========================================================================= */
+
+/* Pop-in for the surrounding badge */
+@keyframes mark-pop {
+  0% {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+.mark-pop {
+  animation: mark-pop 0.55s cubic-bezier(0.22, 1.4, 0.36, 1) both;
+}
+
+/* Stroke draw-in for the path itself */
+@keyframes stroke-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.check-draw {
+  stroke-dasharray: 24;
+  stroke-dashoffset: 24;
+  animation: stroke-draw 0.55s cubic-bezier(0.65, 0, 0.35, 1) 0.18s forwards;
+}
+.cross-draw-a {
+  stroke-dasharray: 18;
+  stroke-dashoffset: 18;
+  animation: stroke-draw 0.32s ease-out 0.1s forwards;
+}
+.cross-draw-b {
+  stroke-dasharray: 18;
+  stroke-dashoffset: 18;
+  animation: stroke-draw 0.32s ease-out 0.38s forwards;
+}
+
+/* Soft outward pulse ring sitting behind the badge */
+@keyframes mark-ring {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.55;
+  }
+  100% {
+    transform: scale(1.7);
+    opacity: 0;
+  }
+}
+.mark-ring {
+  animation: mark-ring 2.4s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+.mark-ring-delay {
+  animation-delay: 1.2s;
+}
+
+/* Continuous left-to-right marquee strip. */
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+.marquee-track {
+  animation: marquee 38s linear infinite;
+}
+
+/* Fade-in-up entrance used by hero copy. */
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.fade-up {
+  animation: fade-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.fade-up-1 {
+  animation-delay: 0.05s;
+}
+.fade-up-2 {
+  animation-delay: 0.18s;
+}
+.fade-up-3 {
+  animation-delay: 0.32s;
+}
+.fade-up-4 {
+  animation-delay: 0.46s;
+}
+
+/* ---- Trading-graph background animations ---------------------------------
+   Used by the profile hero card. A long, slow, continuous loop keeps the
+   motion subtle so it never competes with the foreground content. */
+@keyframes chart-line-flow {
+  0% {
+    stroke-dashoffset: 0;
+    opacity: 0.85;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    stroke-dashoffset: -480;
+    opacity: 0.85;
+  }
+}
+.chart-line-flow {
+  stroke-dasharray: 6 8;
+  animation: chart-line-flow 14s linear infinite;
+}
+
+@keyframes chart-pulse-dot {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.6);
+    opacity: 0.4;
+  }
+}
+.chart-pulse-dot {
+  transform-origin: center;
+  transform-box: fill-box;
+  animation: chart-pulse-dot 1.8s ease-in-out infinite;
+}
+
+@keyframes chart-candle-rise {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scaleY(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scaleY(1.08);
+  }
+}
+.chart-candle {
+  transform-origin: bottom center;
+  transform-box: fill-box;
+  animation: chart-candle-rise 4s ease-in-out infinite;
+}
+
+/* Continuous badge shine effect — smooth, non-laggy sweep */
+@keyframes badge-shine {
+  0% {
+    left: -100%;
+  }
+  50%, 100% {
+    left: 150%;
+  }
+}
+.badge-shine::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.35) 50%,
+    transparent 100%
+  );
+  transform: skewX(-20deg);
+  animation: badge-shine 2.5s ease-in-out infinite;
+}
+
+/* Respect reduced-motion preferences. */
+@media (prefers-reduced-motion: reduce) {
+  .live-dot,
+  .icon-ring,
+  .float-soft,
+  .aurora,
+  .sheen,
+  .cta-shine,
+  .cta-pulse,
+  .spin-slow,
+  .icon-pulse,
+  .icon-drift,
+  .icon-tilt,
+  .glow-soft,
+  .glow-gold,
+  .marquee-track,
+  .fade-up,
+  .mark-pop,
+  .mark-ring,
+  .check-draw,
+  .cross-draw-a,
+  .cross-draw-b,
+  .chart-line-flow,
+  .chart-pulse-dot,
+  .chart-candle,
+    .text-shine,
+    .text-shine-accent,
+    .text-shine-luxe,
+    .text-shine-luxe-accent,
+    .text-shine-teal,
+    .text-shine-teal-accent,
+    .text-shine-volt,
+    .text-shine-volt-accent,
+    .badge-shine::after {
+    animation: none !important;
+  }
+}
+
+/* =========================================================================
+   ChartFlow Ai — HOME PAGE THEME ("Volt": charcoal + electric lime)
+   Palette:
+     #141517  charcoal (base)      #0E0F11  deep charcoal
+     #1A1C20  surface              #212429  surface-2
+     #CDFF17  volt lime            #A9D40E  volt deep
+     #829B19  volt shadow          #8B8E93  muted text
+   Scoped to `.cf-home` so the rest of the site keeps its current look.
+   ========================================================================= */
+.cf-home {
+  --cf-accent: #cdff17;
+  --cf-brand-1: #cdff17;
+  --cf-brand-2: #a9d40e;
+  --cf-brand-3: #e9ff8a;
+  --cf-brand-bg-1: #23271a;
+  --cf-brand-bg-2: #0f1012;
+  font-family: var(--font-cf-sans), var(--font-cf-bengali), ui-sans-serif, system-ui, sans-serif;
+  background-color: #141517;
+  color: #ffffff;
+}
+html:has(> body > .cf-home),
+body:has(> .cf-home) {
+  background-color: #141517;
+}
+/* Bengali letterforms join — drop the wide tracking used on Latin labels */
+.cf-home[data-lang="bn"] :is(.cf-pill, .cf-mono, [class*="tracking-["]) {
+  letter-spacing: 0.01em !important;
+}
+.cf-home[data-lang="bn"] .cf-headline {
+  letter-spacing: 0 !important;
+}
+.cf-display {
+  font-family: var(--font-cf-display), var(--font-cf-bengali), ui-sans-serif, system-ui, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+.cf-headline {
+  font-family: var(--font-cf-display), var(--font-cf-bengali), ui-sans-serif, system-ui, sans-serif;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: -0.02em;
+  line-height: 1.02;
+}
+.cf-home a, .cf-home button, .cf-ui {
+  font-family: var(--font-cf-sans), var(--font-cf-bengali), ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: -0.005em;
+}
+.cf-mono {
+  font-family: var(--font-cf-mono), var(--font-cf-bengali), ui-monospace, monospace;
+}
+
+/* Smoky backdrop — faint olive haze in the corners like a lit trading desk */
+.cf-haze {
+  background:
+    radial-gradient(ellipse 60% 50% at 0% 0%, rgba(205, 255, 23, 0.075), transparent 60%),
+    radial-gradient(ellipse 50% 45% at 100% 10%, rgba(205, 255, 23, 0.045), transparent 60%),
+    radial-gradient(ellipse 70% 40% at 50% 100%, rgba(205, 255, 23, 0.05), transparent 65%);
+}
+
+/* Film-grain texture — fixed, ultra subtle */
+.cf-grain::after {
+  content: "";
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Fine hairline grid, faded with a radial mask */
+.cf-grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 72px 72px;
+  -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 30%, #000 30%, transparent 75%);
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 30%, #000 30%, transparent 75%);
+}
+
+/* Surface cards — soft charcoal glass with a hairline border */
+.cf-card {
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: linear-gradient(180deg, #1c1e23 0%, #17191d 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 20px 50px -30px rgba(0, 0, 0, 0.8);
+}
+.cf-card-strong {
+  border: 1px solid rgba(205, 255, 23, 0.18);
+  background:
+    radial-gradient(ellipse 90% 60% at 50% 0%, rgba(205, 255, 23, 0.10), transparent 60%),
+    linear-gradient(180deg, #1b1d21 0%, #121316 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 30px 80px -40px rgba(0, 0, 0, 0.9);
+}
+.cf-card-core {
+  border: 1px solid rgba(205, 255, 23, 0.22);
+  background:
+    radial-gradient(ellipse 80% 70% at 100% 0%, rgba(205, 255, 23, 0.22), transparent 55%),
+    linear-gradient(180deg, #16170f 0%, #0e0f11 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 40px 100px -40px rgba(0, 0, 0, 0.95);
+}
+
+/* Text treatments */
+.cf-text-emerald,
+.cf-text-volt {
+  color: #cdff17;
+  text-shadow: 0 0 28px rgba(205, 255, 23, 0.35);
+}
+.cf-text-gold,
+.cf-text-steel {
+  background: linear-gradient(180deg, #ffffff 0%, #d6d8dc 40%, #8b8e93 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* 3D "volt" button — lime slab with a pressed-in bottom edge */
+.cf-btn-volt {
+  position: relative;
+  background: linear-gradient(180deg, #e3ff5c 0%, #cdff17 45%, #c2f20f 100%);
+  color: #141517;
+  box-shadow:
+    inset 0 -3px 0 0 #829b19,
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.55),
+    0 6px 4px 0 rgba(0, 0, 0, 0.25),
+    0 32px 24px 0 rgba(0, 0, 0, 0.15),
+    0 0 48px -8px rgba(205, 255, 23, 0.45);
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.25s, filter 0.25s;
+}
+.cf-btn-volt:hover {
+  transform: translateY(-2px);
+  filter: saturate(1.08);
+  box-shadow:
+    inset 0 -3px 0 0 #829b19,
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.6),
+    0 10px 6px 0 rgba(0, 0, 0, 0.28),
+    0 40px 30px 0 rgba(0, 0, 0, 0.18),
+    0 0 64px -8px rgba(205, 255, 23, 0.6);
+}
+.cf-btn-volt:active {
+  transform: translateY(1px);
+  box-shadow:
+    inset 0 -1px 0 0 #829b19,
+    0 2px 2px 0 rgba(0, 0, 0, 0.25),
+    0 0 32px -8px rgba(205, 255, 23, 0.4);
+}
+
+/* Dark slab button — same silhouette, charcoal finish */
+.cf-btn-dark {
+  background: linear-gradient(180deg, #2a2d33 0%, #1d1f24 100%);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    inset 0 -3px 0 0 #0e0f11,
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.08),
+    0 6px 4px 0 rgba(0, 0, 0, 0.25),
+    0 24px 20px 0 rgba(0, 0, 0, 0.15);
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.25s, box-shadow 0.25s;
+}
+.cf-btn-dark:hover {
+  transform: translateY(-2px);
+  border-color: rgba(205, 255, 23, 0.35);
+}
+.cf-btn-dark:active {
+  transform: translateY(1px);
+  box-shadow: inset 0 -1px 0 0 #0e0f11, 0 2px 2px 0 rgba(0, 0, 0, 0.25);
+}
+
+/* White slab button — premium tier */
+.cf-btn-white {
+  background: linear-gradient(180deg, #ffffff 0%, #e9eaed 100%);
+  color: #141517;
+  box-shadow:
+    inset 0 -3px 0 0 #9a9da3,
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.9),
+    0 6px 4px 0 rgba(0, 0, 0, 0.25),
+    0 24px 20px 0 rgba(0, 0, 0, 0.15);
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.25s;
+}
+.cf-btn-white:hover { transform: translateY(-2px); }
+.cf-btn-white:active {
+  transform: translateY(1px);
+  box-shadow: inset 0 -1px 0 0 #9a9da3, 0 2px 2px 0 rgba(0, 0, 0, 0.25);
+}
+
+/* Pill badge */
+.cf-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: linear-gradient(180deg, #24272c 0%, #1b1d21 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 10px 30px -14px rgba(0, 0, 0, 0.8);
+  padding: 0.55rem 1.1rem 0.55rem 0.9rem;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+/* Round lime emblem */
+.cf-orb {
+  background:
+    radial-gradient(circle at 35% 30%, rgba(205, 255, 23, 0.28), rgba(205, 255, 23, 0.06) 55%, transparent 75%),
+    linear-gradient(180deg, #23271a 0%, #15170f 100%);
+  border: 1px solid rgba(205, 255, 23, 0.28);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 0 32px -10px rgba(205, 255, 23, 0.45);
+  color: #cdff17;
+}
+
+/* Floating chips */
+@keyframes cf-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+.cf-float { animation: cf-float 6s ease-in-out infinite; }
+.cf-float-delay { animation: cf-float 6s ease-in-out 1.8s infinite; }
+
+/* Logo flow line draw + spark */
+.cf-flow-draw {
+  stroke-dasharray: 48;
+  stroke-dashoffset: 48;
+  animation: cf-draw 1.4s cubic-bezier(0.65, 0, 0.35, 1) 0.2s forwards;
+}
+@keyframes cf-draw { to { stroke-dashoffset: 0; } }
+.cf-spark { transform-origin: 38.5px 13px; animation: cf-spark 2.8s ease-in-out infinite; }
+@keyframes cf-spark {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.65; transform: scale(0.8); }
+}
+
+/* Slow pulse for live dots */
+@keyframes cf-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+.cf-pulse { animation: cf-pulse 1.8s ease-in-out infinite; }
+
+/* Aurora glow drift */
+@keyframes cf-aurora {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(4%, -3%, 0) scale(1.08); }
+}
+.cf-aurora { animation: cf-aurora 16s ease-in-out infinite; }
+
+/* Reveal on load */
+@keyframes cf-rise {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.cf-rise { opacity: 0; animation: cf-rise 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+.cf-d1 { animation-delay: 0.05s; }
+.cf-d2 { animation-delay: 0.15s; }
+.cf-d3 { animation-delay: 0.28s; }
+.cf-d4 { animation-delay: 0.42s; }
+.cf-d5 { animation-delay: 0.56s; }
+
+/* Ticker marquee */
+@keyframes cf-marquee { to { transform: translateX(-50%); } }
+.cf-marquee { animation: cf-marquee 38s linear infinite; }
+
+/* Accordion trigger icon override inside FAQ */
+.cf-faq [data-slot="accordion-trigger"] > svg { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .cf-float, .cf-float-delay, .cf-aurora, .cf-marquee, .cf-spark, .cf-pulse { animation: none !important; }
+  .cf-rise { opacity: 1; animation: none; }
+  .cf-flow-draw { stroke-dashoffset: 0; animation: none; }
+}
+
+/* Indeterminate progress bar (download page) */
+@keyframes cf-indeterminate {
+  0% { transform: translateX(-110%); }
+  100% { transform: translateX(320%); }
+}
+.cf-indeterminate { animation: cf-indeterminate 1.3s ease-in-out infinite; }
+
+/* Auth input — charcoal well with lime focus ring */
+.cf-input {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, #121316 0%, #17191d 100%);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.45);
+  transition: border-color 0.25s, box-shadow 0.25s;
+}
+.cf-input:focus-within {
+  border-color: rgba(205, 255, 23, 0.55);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.45), 0 0 0 3px rgba(205, 255, 23, 0.12), 0 0 28px -8px rgba(205, 255, 23, 0.45);
+}
+
+/* Home-page typography for signal rooms */
+.cf-theme,
+.cf-theme :is(button, input, select, a) {
+  font-family: var(--font-cf-sans), var(--font-cf-bengali), ui-sans-serif, system-ui, sans-serif;
+}
+.cf-theme .font-display {
+  font-family: var(--font-cf-display), var(--font-cf-bengali), ui-sans-serif, system-ui, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.cf-theme .font-mono {
+  font-family: var(--font-cf-mono), ui-monospace, monospace;
+}
+
+
+/* Liquid glass — floating mobile tab bar. */
+.cf-liquid-glass {
+  background: linear-gradient(180deg, rgba(58, 60, 62, 0.55) 0%, rgba(24, 25, 27, 0.62) 55%, rgba(12, 13, 14, 0.72) 100%);
+  -webkit-backdrop-filter: blur(22px) saturate(170%);
+  backdrop-filter: blur(22px) saturate(170%);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.55),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.03),
+    0 18px 40px -12px rgba(0, 0, 0, 0.85),
+    0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+.cf-liquid-glass::before {
+  content: "";
+  position: absolute;
+  inset: 1px 10% auto 10%;
+  height: 45%;
+  border-radius: 9999px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.10), transparent);
+  pointer-events: none;
+}
+.cf-liquid-pill {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.20), rgba(255, 255, 255, 0.07));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.30),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.35),
+    0 6px 16px -8px rgba(0, 0, 0, 0.8),
+    0 0 18px -6px rgba(205, 255, 23, 0.35);
+}
+
+/* Desktop app sidebar — collapsible, state lives on html[data-sidebar] */
+:root { --cf-sb-w: 280px; }
+html[data-sidebar="collapsed"] { --cf-sb-w: 92px; }
+.cf-sb { width: var(--cf-sb-w); transition: width 0.3s cubic-bezier(0.22, 1, 0.36, 1); }
+.cf-sb-panel {
+  border: 1px solid rgba(205, 255, 23, 0.14);
+  background:
+    radial-gradient(ellipse 120% 40% at 0% 0%, rgba(205, 255, 23, 0.09), transparent 60%),
+    radial-gradient(ellipse 100% 30% at 100% 100%, rgba(205, 255, 23, 0.05), transparent 60%),
+    linear-gradient(180deg, #1b1d21 0%, #111214 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 30px 80px -30px rgba(0, 0, 0, 0.9);
+}
+.cf-sb-label { transition: opacity 0.2s ease; white-space: nowrap; }
+.cf-sb-mark { display: none; }
+.cf-sb-chevron { transition: transform 0.3s ease; }
+.cf-sb-scroll { scrollbar-width: none; }
+.cf-sb-scroll::-webkit-scrollbar { display: none; }
+html[data-sidebar="collapsed"] .cf-sb-label { display: none; }
+html[data-sidebar="collapsed"] .cf-sb-mark { display: block; }
+html[data-sidebar="collapsed"] .cf-sb-chevron { transform: rotate(180deg); }
+html[data-sidebar="collapsed"] .cf-sb-head,
+html[data-sidebar="collapsed"] .cf-sb-link,
+html[data-sidebar="collapsed"] .cf-sb-account { justify-content: center; }
+html[data-sidebar="collapsed"] .cf-sb-section { height: 1px; margin: 12px 10px; padding: 0; background: rgba(255, 255, 255, 0.06); }

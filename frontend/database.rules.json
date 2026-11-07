@@ -1,0 +1,24 @@
+{
+  "rules": {
+    ".read": "auth != null && auth.token.admin === true",
+    ".write": "auth != null && auth.token.admin === true",
+    "users": { ".indexOn": ["email"] },
+    "signals": {
+      "c2s": {
+        "$uid": { ".read": "auth != null && auth.uid === $uid", ".indexOn": ["entry_at", "status"] }
+      },
+      "future": {
+        "$uid": { ".read": "auth != null && auth.uid === $uid", ".indexOn": ["entry_at", "status", "batch_id"] }
+      }
+    },
+    "auto": {
+      "settings": { "$uid": { ".read": "auth != null && auth.uid === $uid" } },
+      "sessions": { "$uid": { ".read": "auth != null && auth.uid === $uid", ".indexOn": ["status", "created_at"] } },
+      "signals": { "$uid": { ".read": "auth != null && auth.uid === $uid" } },
+      "reports": { "$uid": { ".read": "auth != null && auth.uid === $uid" } }
+    },
+    "telegram": {
+      "links": { "$uid": { ".read": "auth != null && auth.uid === $uid" } }
+    }
+  }
+}

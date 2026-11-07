@@ -1,0 +1,43 @@
+# Requires Python 3.11 or 3.12 (NOT 3.13/3.14 — wheels not yet available for
+# pydantic-core / pyquotex dependencies on those versions, which forces a Rust
+# source build and fails on Windows without MSVC Build Tools.)
+
+# --- HTTP / WebSocket server ------------------------------------------------
+fastapi>=0.110,<0.116
+uvicorn[standard]>=0.29,<0.31
+pydantic>=2.6,<2.10
+python-multipart>=0.0.9
+# .env file loader (auto-loads python_backend/.env on startup so systemd /
+# Docker / VPS deployments can ship credentials without exporting env vars
+# manually). Safe in dev too — if .env doesn't exist, nothing happens.
+python-dotenv>=1.0,<2.0
+# IMPORTANT: must be >=14.0 — pyquotex calls websockets.connect(additional_headers=...)
+# which only exists in websockets 14+. On 10-13 the kwarg was `extra_headers`,
+# and the old versions blindly forward the unknown kwarg to asyncio's
+# create_connection(), which raises "unexpected keyword argument 'additional_headers'".
+websockets>=14.0,<16.0
+
+# --- pyquotex + its transitive runtime deps ---------------------------------
+# pyquotex's setup.py does NOT declare its own dependencies, so pip won't pull
+# them in automatically. We pin the full set here (same versions the working
+# reference project uses) so `pip install -r requirements.txt` gives you a
+# fully functional environment in one command.
+pyquotex @ git+https://github.com/cleitonleonel/pyquotex.git
+requests==2.32.4
+beautifulsoup4==4.13.4
+soupsieve==2.7
+certifi==2025.6.15
+charset-normalizer==3.4.2
+idna==3.10
+urllib3==2.5.0
+numpy==2.3.1
+pyfiglet==1.0.3
+typing_extensions==4.14.1
+websocket-client==1.8.0
+fake-useragent==2.2.0
+orjson>=3.9.0
+
+# --- Signal engine (Firebase RTDB, Telegram, chart images) ---
+firebase-admin>=6.5,<7
+matplotlib>=3.8
+numpy>=1.26

@@ -1,0 +1,572 @@
+"""All-markets live tick collector (same pattern as crt-chk ``ticks.py``).
+
+Subscribes EVERY open Quotex market on the single pyquotex websocket, drains
+``client.api.realtime_price`` tick buffers and builds candles for each
+period from the first aligned boundary. Browsers only read these candles —
+no broker request is ever made on a client's behalf.
+"""
+from __future__ import annotations
+
+import asyncio
+import inspect
+import logging
+import re
+import time
+from typing import Any, Awaitable, Callable
+
+from pyquotex.utils.processor import calculate_candles
+
+log = logging.getLogger("live-collector")
+
+Key = tuple[str, int]
+KeyCb = Callable[[Key, Any], Awaitable[None]]
+MAX_CANDLES = 500
+HISTORY_COUNT = 499
+V2_TIMEOUT_S = 5.0
+HISTORY_LOAD_TIMEOUT_S = 6.0
+HISTORY_LOAD_STEPS = 12
+BACKFILL_ATTEMPTS = 3
+# Account switch lands exactly on a wall-clock minute (e.g. 09:46:00).
+SWITCH_ALIGN_S = 60
+# After the boundary, keep the old socket for this long to catch its late ticks.
+SWITCH_GRACE_S = 1.5
+OLD_SESSION_CLOSE_DELAY_S = 10
+
+
+def _spacing(candles: list[dict[str, Any]]) -> int:
+    """Most common gap between consecutive candle times (0 if unknown)."""
+    gaps: dict[int, int] = {}
+    for a, b in zip(candles, candles[1:]):
+        g = int(b["time"]) - int(a["time"])
+        gaps[g] = gaps.get(g, 0) + 1
+    return max(gaps, key=gaps.get) if gaps else 0
+
+
+async def _maybe_await(res: Any) -> Any:
+    return await res if inspect.isawaitable(res) else res
+
+
+_CATEGORY_ALIASES = {
+    "currency": "currencies", "currencies": "currencies", "forex": "currencies",
+    "cryptocurrency": "crypto", "crypto": "crypto",
+    "commodity": "commodities", "commodities": "commodities",
+    "stock": "stocks", "stocks": "stocks",
+    "index": "indices", "indices": "indices",
+}
+_CRYPTO_BASES = {
+    "BTC", "ETH", "ADA", "APT", "ARB", "ATO", "AVA", "AVAX", "AXS", "BCH", "BNB", "BON",
+    "DAS", "DOG", "DOGE", "DOT", "ETC", "FLO", "GAL", "HMS", "LIN", "LINK", "LTC", "MEL",
+    "SHIB", "SOL", "TIA", "TON", "TRU", "TRX", "WIF", "XRP", "ZEC", "MATIC", "TRUMP",
+    "BEE", "NOT", "SUI", "NEAR", "FIL", "UNI", "XLM", "ICP", "INJ", "OP", "PEPE", "SEI",
+}
+_FIAT = set(
+    "USD EUR GBP JPY CHF AUD CAD NZD BRL MXN ARS PKR PHP INR BDT IDR TRY ZAR EGP NGN DZD "
+    "COP CLP PEN SGD HKD CNY CNH KRW THB MYR VND RUB UAH SAR AED QAR KWD BHD OMR JOD LBP "
+    "YER SYP IRR ILS KES TND MAD CZK PLN HUF SEK NOK DKK RON BGN ISK KZT UZS LKR NPR TWD".split()
+)
+_COMMODITY_PREFIXES = ("XAU", "XAG", "XPT", "XPD", "XNG", "UKBRENT", "USCRUDE", "BRENT", "WTI", "NATGAS")
+_INDEX_SYMBOLS = {
+    "DJIUSD", "NDXUSD", "SPXUSD", "F40EUR", "FTSGBP", "HSIHKD", "IBXEUR", "JPXJPY",
+    "CHIA50", "STXEUR", "D30EUR", "DAXEUR", "AUS200", "E35EUR", "E50EUR",
+}
+
+
+_COMMODITY_NAME = re.compile(r"\b(gold|silver|brent|crude|oil|natural gas|platinum|palladium|copper)\b")
+_CRYPTO_NAMES = {
+    "bitcoin", "ethereum", "binance coin", "ripple", "litecoin", "bitcoin cash", "cardano",
+    "dogecoin", "polkadot", "solana", "tron", "chainlink", "avalanche", "cosmos",
+    "ethereum classic", "zcash", "dash", "shiba inu", "polygon", "axie infinity", "toncoin",
+    "aptos", "arbitrum", "bonk", "floki", "gala", "hamster kombat", "melania meme",
+    "celestia", "truefi", "dogwifhat", "trump", "pepe",
+}
+
+
+def market_category(code: str, raw_type: Any, name: str = "") -> str:
+    """Quotex market group: currencies / crypto / commodities / stocks / indices.
+
+    Symbol/name checks win over the broker's type field, which is not
+    reliable for OTC crypto / commodities.
+    """
+    base = str(code).upper().replace("_OTC", "")
+    nm = str(name or "").lower().replace("(otc)", "").strip()
+    if base.startswith(_COMMODITY_PREFIXES) or _COMMODITY_NAME.search(nm):
+        return "commodities"
+    if base in _CRYPTO_BASES or (base.endswith("USD") and base[:-3] in _CRYPTO_BASES) or nm in _CRYPTO_NAMES:
+        return "crypto"
+    if base in _INDEX_SYMBOLS:
+        return "indices"
+    if len(base) == 6 and base[:3] in _FIAT and base[3:] in _FIAT:
+        return "currencies"
+    if isinstance(raw_type, str) and raw_type.lower() in _CATEGORY_ALIASES:
+        return _CATEGORY_ALIASES[raw_type.lower()]
+    return "stocks"
+
+
+def open_markets(instruments: Any) -> list[dict[str, Any]]:
+    """Open markets with a payout, from pyquotex's raw instrument rows."""
+    out: list[dict[str, Any]] = []
+    for i in instruments or []:
+        try:
+            code = i[1]
+            name = str(i[2]).replace("\n", "")
+            is_open = bool(i[14])
+            payout = i[-9] if isinstance(i[-9], (int, float)) else i[5]
+            raw_type = i[3]
+        except (IndexError, TypeError):
+            continue
+        if not code or not is_open or not isinstance(payout, (int, float)) or payout <= 0:
+            continue
+        out.append({
+            "symbol": code,
+            "name": name,
+            "payout": int(payout),
+            "is_open": True,
+            "type": "otc" if str(code).endswith("_otc") else "real",
+            "category": market_category(code, raw_type, name),
+        })
+    out.sort(key=lambda m: (-m["payout"], m["symbol"]))
+    return out
+
+
+class LiveCollector:
+    def __init__(
+        self,
+        session: Any,
+        store: Any,
+        periods: list[int],
+        align_s: int,
+        on_candle: KeyCb,
+        on_history: KeyCb,
+        on_markets: Callable[[], Awaitable[None]],
+        backfill: bool = True,
+        idle_limit_s: float = 90,
+        resub_s: float = 300,
+        refresh_s: float = 60,
+        on_switch: Callable[[Any], Awaitable[None]] | None = None,
+    ) -> None:
+        self.session = session
+        self.store = store
+        self.periods = periods
+        self.align_s = align_s
+        self.on_candle = on_candle
+        self.on_history = on_history
+        self.on_markets = on_markets
+        self.on_switch = on_switch
+        self._pending: dict[str, Any] | None = None
+        self._switched = asyncio.Event()
+        self.backfill_enabled = backfill
+        self.idle_limit_s = idle_limit_s
+        self.resub_s = resub_s
+        self.refresh_s = refresh_s
+        self.markets: dict[str, dict[str, Any]] = {}
+        self.started_at: float | None = None
+        self.last_tick = time.time()
+        self._forming: dict[Key, dict[str, Any]] = {}
+        self._backfilled: set[Key] = set()
+        self._backfill_task: asyncio.Task | None = None
+        # One market at a time on the socket: pyquotex only keeps the
+        # history/list/v2 reply of ``api.current_asset``.
+        self._ws_lock = asyncio.Lock()
+
+    # ------------------------------------------------------------ public
+    @property
+    def started(self) -> bool:
+        return self.started_at is not None and time.time() >= self.started_at
+
+    def is_live(self, key: Key) -> bool:
+        return self.started and key[0] in self.markets and key[1] in self.periods
+
+    def assets(self) -> list[dict[str, Any]]:
+        return list(self.markets.values()) if self.started else []
+
+    # ------------------------------------------------------------ helpers
+    @property
+    def _client(self) -> Any:
+        return getattr(self.session, "client", None)
+
+    async def _refresh_markets(self) -> set[str]:
+        client = self._client
+        instruments = await _maybe_await(client.get_instruments())
+        fresh = {m["symbol"]: m for m in open_markets(instruments)}
+        if not fresh and self.markets:
+            # pyquotex occasionally overwrites api.instruments with an
+            # unrelated frame — keep the last good list.
+            return set()
+        added = set(fresh) - set(self.markets)
+        for code in set(self.markets) - set(fresh):
+            for p in self.periods:
+                self._forming.pop((code, p), None)
+        self.markets = fresh
+        return added
+
+    async def _subscribe(self, codes: list[str]) -> None:
+        client = self._client
+        async with self._ws_lock:
+            for code in codes:
+                try:
+                    await _maybe_await(client.start_candles_stream(code, 60))
+                except Exception as exc:  # noqa: BLE001
+                    log.debug("subscribe %s failed: %s", code, exc)
+                await asyncio.sleep(0.04)
+
+    def _next_boundary(self) -> float:
+        now = time.time()
+        if self.align_s <= 0:
+            return now
+        return float((int(now) // self.align_s + 1) * self.align_s)
+
+    def _apply_tick(self, code: str, ts: float, price: float, out: dict) -> None:
+        for p in self.periods:
+            key = (code, p)
+            b = (int(ts) // p) * p
+            cur = self._forming.get(key)
+            if cur is not None and b < cur["time"]:
+                continue
+            if cur is None or b > cur["time"]:
+                if cur is not None:
+                    out[(key, cur["time"])] = dict(cur)
+                    # Forward-fill silent buckets with flat candles.
+                    gap_t = cur["time"] + p
+                    while gap_t < b and b - gap_t <= MAX_CANDLES * p:
+                        c = cur["close"]
+                        flat = {"time": gap_t, "open": c, "high": c, "low": c, "close": c, "volume": 0.0}
+                        out[(key, gap_t)] = flat
+                        gap_t += p
+                cur = {"time": b, "open": price, "high": price, "low": price, "close": price, "volume": 0.0}
+                self._forming[key] = cur
+            else:
+                cur["high"] = max(cur["high"], price)
+                cur["low"] = min(cur["low"], price)
+                cur["close"] = price
+            cur["volume"] += 1
+            out[(key, b)] = dict(cur)
+
+    def _drain(
+        self,
+        discard: bool,
+        client: Any = None,
+        min_ts: float = 0.0,
+        max_ts: float = float("inf"),
+    ) -> dict:
+        """Pop every buffered tick; returns {(key, time): candle} in time order.
+
+        ``client`` defaults to the active session; ticks outside [min_ts, max_ts) are dropped.
+        """
+        is_current = client is None
+        api = getattr(self._client if is_current else client, "api", None)
+        out: dict = {}
+        if api is None:
+            return out
+        buffers = getattr(api, "realtime_price", None) or {}
+        for code in list(buffers.keys()):
+            buf = buffers.get(code)
+            if not buf:
+                continue
+            n = len(buf)
+            items = buf[:n]
+            del buf[:n]
+            if is_current:
+                self.last_tick = time.time()
+            if discard or code not in self.markets:
+                continue
+            for t in items:
+                try:
+                    ts = float(t["time"])
+                    price = float(t["price"])
+                except (KeyError, TypeError, ValueError):
+                    continue
+                if self.started_at is None or ts < self.started_at or ts < min_ts or ts >= max_ts:
+                    continue
+                self._apply_tick(code, ts, price, out)
+        return out
+
+    async def _emit(self, changed: dict) -> None:
+        for (key, _t), candle in changed.items():
+            self.store.push(key, candle, key[1])
+            await self.on_candle(key, candle)
+
+    def _v2_candles(self, api: Any, code: str, p: int, ticks: Any) -> list[dict[str, Any]] | None:
+        """pyquotex prepare_candles (crt-chk): tick-built candles + broker v2 candles.
+
+        Returns None when the v2 reply belongs to another timeframe.
+        """
+        v2 = (api.candle_v2_data.get(code) or {}).get("candles") or []
+        # Quotex sends v2 candles newest-first, so compare on time-sorted rows.
+        v2 = sorted(v2, key=lambda c: float(c.get("time", 0) or 0))
+        if v2 and _spacing(v2) not in (0, p):
+            return None
+        book: dict[int, dict[str, Any]] = {}
+        try:
+            for c in calculate_candles(ticks, p):
+                book[int(c["time"])] = c
+        except Exception:  # noqa: BLE001
+            pass
+        # Broker OHLC wins over tick-built buckets (running candle is cut later).
+        for c in v2:
+            book[(int(c["time"]) // p) * p] = c
+        out = []
+        for t in sorted(book):
+            c = book[t]
+            try:
+                o, h, lo, cl = (float(c[k]) for k in ("open", "high", "low", "close"))
+            except (KeyError, TypeError, ValueError):
+                continue
+            out.append({"time": t, "open": o, "high": max(h, o, cl), "low": min(lo, o, cl),
+                        "close": cl, "volume": 0.0})
+        return out
+
+    async def _history_load_walk(self, code: str, p: int, cut: int) -> dict[int, dict[str, Any]]:
+        """pyquotex get_historical_candles style: history/load by index, walking back until 199."""
+        book: dict[int, dict[str, Any]] = {}
+        end = cut
+        for _ in range(HISTORY_LOAD_STEPS):
+            rows = await self.session.history_load(
+                code, p, end, HISTORY_COUNT * p, timeout=HISTORY_LOAD_TIMEOUT_S
+            )
+            new = [c for c in rows if c["time"] < cut and c["time"] not in book]
+            if not new:
+                break
+            for c in new:
+                book[int(c["time"])] = dict(c, volume=0.0)
+            if len(book) >= HISTORY_COUNT:
+                break
+            end = min(int(c["time"]) for c in new)
+        return book
+
+    async def _v2_fetch(self, client: Any, api: Any, code: str, p: int) -> list[dict[str, Any]]:
+        """Re-subscribe the asset so Quotex sends a fresh history/list/v2 (199 candles)."""
+        async with self._ws_lock:
+            api.candles.candles_data = None
+            api.candle_v2_data.pop(code, None)
+            # Quotex only sends v2 on a fresh subscribe, not for an already-followed asset.
+            await _maybe_await(client.stop_candles_stream(code))
+            await asyncio.sleep(0.2)
+            await _maybe_await(client.start_candles_stream(code, p))
+            deadline = time.time() + V2_TIMEOUT_S
+            while time.time() < deadline:
+                ticks = api.candles.candles_data
+                if ticks is not None:
+                    got = self._v2_candles(api, code, p, ticks)
+                    if got is not None:
+                        return got
+                    api.candles.candles_data = None  # late reply for another timeframe
+                await asyncio.sleep(0.1)
+        return []
+
+    async def _backfill_one(self, key: Key) -> bool:
+        """history/load walk-back first; history/list/v2 fills the rest."""
+        code, p = key
+        client = self._client
+        api = getattr(client, "api", None)
+        if code not in self.markets:
+            return True
+        if api is None:
+            return False
+        start = int(self.started_at or time.time())
+        stored = self.store.get(key)
+        # Candles before ``start`` were loaded from disk (previous run).
+        live = [c for c in stored if int(c["time"]) >= start]
+        saved = [c for c in stored if int(c["time"]) < start]
+        cut = min(start, int(live[0]["time"])) if live else start
+        book: dict[int, dict[str, Any]] = {}
+        sources = []
+        try:
+            book = await self._history_load_walk(code, p, cut)
+            if book:
+                sources.append(f"history/load={len(book)}")
+            if len(book) < HISTORY_COUNT:
+                v2 = await self._v2_fetch(client, api, code, p)
+                added = 0
+                for c in v2:
+                    if c["time"] < cut and c["time"] not in book:
+                        book[c["time"]] = c
+                        added += 1
+                if v2:
+                    sources.append(f"v2=+{added}")
+        except Exception as exc:  # noqa: BLE001
+            log.warning("backfill %s/%s failed: %r", code, p, exc)
+        if not book:
+            log.warning("backfill %s/%ss: no history from history/load or v2", code, p)
+            return False
+        older = self._merge_saved(saved, book, p, cut)
+        if len(older) > len(book):
+            sources.append(f"saved=+{len(older) - len(book)}")
+        self._backfilled.add(key)
+        log.info("history %s/%ss: %d candles (%s)", code, p, len(older), ", ".join(sources))
+        live = [c for c in self.store.get(key) if int(c["time"]) >= cut]
+        self.store.set_history(key, (older + live)[-MAX_CANDLES * 2:], p)
+        await self.on_history(key, self.store.get(key))
+        return True
+
+    @staticmethod
+    def _merge_saved(
+        saved: list[dict[str, Any]], book: dict[int, dict[str, Any]], p: int, cut: int
+    ) -> list[dict[str, Any]]:
+        """Disk candles fill times the broker did not return (broker OHLC wins), only if contiguous."""
+        merged = dict(book)
+        if saved and int(saved[-1]["time"]) >= min(book) - p:
+            for c in saved:
+                merged.setdefault(int(c["time"]), c)
+        return [merged[t] for t in sorted(merged) if t < cut][-HISTORY_COUNT:]
+
+    async def _backfill(self) -> None:
+        """Walk every market one by one (crt-chk style), retrying failures."""
+        while self.started_at is not None and time.time() < self.started_at:
+            await asyncio.sleep(0.5)
+        for attempt in range(1, BACKFILL_ATTEMPTS + 1):
+            pending = [
+                (code, p) for code in list(self.markets) for p in self.periods
+                if (code, p) not in self._backfilled
+            ]
+            if not pending:
+                break
+            failed = []
+            for k in pending:
+                if not await self._backfill_one(k):
+                    failed.append(k)
+                await self._emit(self._drain(discard=False))
+            log.info(
+                "backfill round %d: %d/%d ok, %d failed",
+                attempt, len(pending) - len(failed), len(pending), len(failed),
+            )
+            if failed:
+                await asyncio.sleep(2)
+        # Put every market back on the 60s stream after the per-period requests.
+        await self._subscribe(list(self.markets))
+        total = len(self.markets) * len(self.periods)
+        log.info("backfill finished: %d/%d streams have history", len(self._backfilled), total)
+
+    def _start_backfill(self) -> None:
+        if not self.backfill_enabled:
+            return
+        if self._backfill_task is None or self._backfill_task.done():
+            self._backfill_task = asyncio.create_task(self._backfill())
+
+    # ------------------------------------------------------------ account switch
+    @property
+    def pending_switch(self) -> dict[str, Any] | None:
+        return self._pending
+
+    async def prepare_switch(self, new_session: Any, delay_s: float) -> float:
+        """Subscribe every open market on ``new_session``; returns the minute-aligned switch time."""
+        client = new_session.client
+        instruments = await _maybe_await(client.get_instruments())
+        codes = [m["symbol"] for m in open_markets(instruments)] or list(self.markets)
+        for code in codes:
+            try:
+                await _maybe_await(client.start_candles_stream(code, 60))
+            except Exception as exc:  # noqa: BLE001
+                log.debug("new session subscribe %s failed: %s", code, exc)
+            await asyncio.sleep(0.04)
+        ready = time.time() + delay_s
+        at = float((int(ready) // SWITCH_ALIGN_S + 1) * SWITCH_ALIGN_S)
+        self._switched = asyncio.Event()
+        self._pending = {"session": new_session, "at": at}
+        log.info(
+            "new session %s ready: %d markets subscribed — switching at %s",
+            getattr(new_session, "email", "?"), len(codes),
+            time.strftime("%H:%M:%S", time.localtime(at)),
+        )
+        return at
+
+    async def wait_switched(self) -> None:
+        await self._switched.wait()
+
+    async def _tick(self) -> None:
+        """Drain ticks; during an account switch, old socket feeds < boundary, new one >= boundary."""
+        p = self._pending
+        if p is None:
+            await self._emit(self._drain(discard=False))
+            return
+        new_client = p["session"].client
+        at = p["at"]
+        if time.time() < at:
+            await self._emit(self._drain(discard=False))
+            self._drain(discard=True, client=new_client)
+            return
+        changed = self._drain(discard=False, max_ts=at)
+        changed.update(self._drain(discard=False, client=new_client, min_ts=at))
+        await self._emit(changed)
+        if time.time() >= at + SWITCH_GRACE_S:
+            await self._finish_switch()
+
+    async def _finish_switch(self) -> None:
+        p, self._pending = self._pending, None
+        old = self.session
+        self.session = p["session"]
+        self.last_tick = time.time()
+        log.info(
+            "session switched %s -> %s (candles kept, ticks continue)",
+            getattr(old, "email", "?"), getattr(self.session, "email", "?"),
+        )
+        if self.on_switch is not None:
+            await self.on_switch(self.session)
+        self._switched.set()
+        asyncio.create_task(self._close_later(old))
+        before = set(self.markets)
+        try:
+            added = await self._refresh_markets()
+            if added:
+                await self._subscribe(sorted(added))
+        except Exception as exc:  # noqa: BLE001
+            log.warning("market refresh after switch failed: %s", exc)
+        if set(self.markets) != before:
+            await self.on_markets()
+
+    async def _close_later(self, old: Any) -> None:
+        await asyncio.sleep(OLD_SESSION_CLOSE_DELAY_S)
+        try:
+            await old.close()
+            log.info("old session %s closed", getattr(old, "email", "?"))
+        except Exception as exc:  # noqa: BLE001
+            log.debug("old session close failed: %s", exc)
+
+    # ------------------------------------------------------------ main loop
+    async def run(self) -> None:
+        while True:
+            try:
+                await self._refresh_markets()
+                await self._subscribe(list(self.markets))
+                last_sub = last_refresh = time.time()
+                first_start = self.started_at is None
+                if first_start:
+                    self.started_at = self._next_boundary()
+                log.info(
+                    "%d markets subscribed — collecting from %s",
+                    len(self.markets),
+                    time.strftime("%H:%M:%S", time.localtime(self.started_at)),
+                )
+                while time.time() < self.started_at:
+                    self._drain(discard=True)
+                    await asyncio.sleep(0.2)
+                await self.on_markets()
+                self._start_backfill()
+                self.last_tick = time.time()
+                while True:
+                    await self._tick()
+                    now = time.time()
+                    if now - self.last_tick > self.idle_limit_s:
+                        raise ConnectionError(f"no ticks for {self.idle_limit_s:.0f}s")
+                    if now - last_refresh > self.refresh_s:
+                        last_refresh = now
+                        before = set(self.markets)
+                        added = await self._refresh_markets()
+                        if added:
+                            await self._subscribe(sorted(added))
+                        # Also retries streams whose history failed earlier.
+                        self._start_backfill()
+                        if set(self.markets) != before:
+                            await self.on_markets()
+                    if now - last_sub > self.resub_s:
+                        await self._subscribe(list(self.markets))
+                        last_sub = time.time()
+                    await asyncio.sleep(0.2)
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:  # noqa: BLE001
+                log.warning("collector error: %s — reconnecting in 10s", exc)
+                await asyncio.sleep(10)
+                try:
+                    await self.session.reconnect()
+                except Exception as rexc:  # noqa: BLE001
+                    log.warning("reconnect failed: %s", rexc)
